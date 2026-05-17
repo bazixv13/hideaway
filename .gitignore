@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.mypy_cache/
+
+# Meson / Ninja / Flatpak
+build-dir/
+_flatpak_build/
+.flatpak-builder/
+*.flatpak
+*.tmp
+meson-private/
+meson-logs/
+subprojects/
+
+# IDEs & OS Clutter
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+.directory
+*~
+*.bak
+*.log
+
+# Mock and Local Build/Deploy Directories
+mock/
+repo/
+gh-pages-deploy/
+publish.sh
+BUILDING.md
+io.github.bazixv13.Hideaway.local.json

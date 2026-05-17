@@ -1,0 +1,18 @@
+#!/usr/bin/env python3
+import os
+import sys
+import signal
+
+# Add the module to Python path
+moduledir = '@moduledir@'
+sys.path.insert(1, moduledir)
+
+import gi
+gi.require_version('Gtk', '4.0')
+gi.require_version('Adw', '1')
+
+from hideaway.main import main
+
+if __name__ == '__main__':
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+    sys.exit(main())

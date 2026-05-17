@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <requires lib="gtk" version="4.0"/>
+  <requires lib="libadwaita" version="1.0"/>
+  <template class="HideawayWindow" parent="AdwApplicationWindow">
+    <property name="default-width">600</property>
+    <property name="default-height">800</property>
+    <property name="title" translatable="yes">Hideaway</property>
+    <child>
+      <object class="AdwToolbarView">
+        <child type="top">
+          <object class="AdwHeaderBar">
+            <child type="start">
+              <object class="GtkToggleButton" id="search_button">
+                <property name="icon-name">system-search-symbolic</property>
+                <property name="tooltip-text" translatable="yes">Search (Ctrl+F)</property>
+              </object>
+            </child>
+            <child type="end">
+              <object class="GtkMenuButton">
+                <property name="icon-name">open-menu-symbolic</property>
+                <property name="popover">
+                  <object class="GtkPopoverMenu">
+                    <property name="menu-model">primary_menu</property>
+                  </object>
+                </property>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child type="top">
+          <object class="GtkSearchBar" id="search_bar">
+            <property name="key-capture-widget">HideawayWindow</property>
+            <binding name="search-mode-enabled">
+              <lookup name="active">search_button</lookup>
+            </binding>
+            <child>
+              <object class="GtkSearchEntry" id="search_entry">
+                <property name="hexpand">true</property>
+                <property name="placeholder-text" translatable="yes">Search applications…</property>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child>
+          <object class="AdwPreferencesPage">
+            <child>
+              <object class="AdwPreferencesGroup">
+                <property name="title" translatable="yes">Installed Applications</property>
+                <property name="description" translatable="yes">Manage applications shown in the GNOME overview.</property>
+                <child>
+                  <object class="GtkListBox" id="app_listbox">
+                    <property name="selection-mode">none</property>
+                    <style>
+                      <class name="boxed-list"/>
+                    </style>
+                  </object>
+                </child>
+              </object>
+            </child>
+          </object>
+        </child>
+      </object>
+    </child>
+  </template>
+
+  <menu id="primary_menu">
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">Preferences</attribute>
+        <attribute name="action">app.preferences</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">About Hideaway</attribute>
+        <attribute name="action">app.about</attribute>
+      </item>
+    </section>
+  </menu>
+</interface>

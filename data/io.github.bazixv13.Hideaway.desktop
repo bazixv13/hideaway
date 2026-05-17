@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Hideaway
+Comment=Manage and hide your desktop applications
+Exec=hideaway
+Icon=io.github.bazixv13.Hideaway
+Terminal=false
+Type=Application
+Categories=Utility;Settings;
+StartupNotify=true

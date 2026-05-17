@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <requires lib="gtk" version="4.0"/>
+  <requires lib="libadwaita" version="1.0"/>
+  <template class="HideawayPreferences" parent="AdwPreferencesWindow">
+    <property name="title" translatable="yes">Preferences</property>
+    <property name="search-enabled">False</property>
+    <child>
+      <object class="AdwPreferencesPage">
+        <child>
+          <object class="AdwPreferencesGroup">
+            <property name="title" translatable="yes">Removal Behavior</property>
+            <property name="description" translatable="yes">Choose how applications are removed from the overview.</property>
+            <child>
+              <object class="AdwActionRow">
+                <property name="title" translatable="yes">Use File Deletion</property>
+                <property name="subtitle" translatable="yes">Instead of hiding, move files to the backup directory. Requires root.</property>
+                <child>
+                  <object class="GtkSwitch" id="behavior_switch">
+                    <property name="valign">center</property>
+                  </object>
+                </child>
+              </object>
+            </child>
+          </object>
+        </child>
+      </object>
+    </child>
+  </template>
+</interface>

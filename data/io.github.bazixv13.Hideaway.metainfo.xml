@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.bazixv13.Hideaway</id>
+  <icon type="remote">https://raw.githubusercontent.com/bazixv13/hideaway/main/data/icons/hicolor/128x128/apps/io.github.bazixv13.Hideaway.png</icon>
+
+  <name>Hideaway</name>
+  <summary>Manage and hide your desktop applications</summary>
+
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+
+  <description>
+    <p>
+      Hideaway is a clean, native GNOME utility that helps you declutter your
+      app grid without uninstalling anything. Easily hide system applications
+      you don't use, and restore them at any time with a single click.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>Browse all installed desktop applications in one place</li>
+      <li>Hide apps from the GNOME overview without removing them</li>
+      <li>Restore hidden apps instantly</li>
+      <li>Optionally move app files to a backup directory for full removal</li>
+    </ul>
+  </description>
+
+  <categories>
+    <category>Utility</category>
+    <category>Settings</category>
+  </categories>
+
+  <launchable type="desktop-id">io.github.bazixv13.Hideaway.desktop</launchable>
+
+  <url type="homepage">https://github.com/bazixv13/hideaway</url>
+  <url type="bugtracker">https://github.com/bazixv13/hideaway/issues</url>
+
+  <developer id="io.github.bazixv13">
+    <name>bazixv13</name>
+  </developer>
+
+  <branding>
+    <color type="primary" scheme_preference="dark">#1e1e2e</color>
+    <color type="primary" scheme_preference="light">#3584e4</color>
+  </branding>
+
+  <content_rating type="oars-1.1" />
+
+  <screenshots>
+    <screenshot type="default">
+      <caption>Manage and restore applications with an intuitive interface.</caption>
+      <image width="900" height="1163">https://raw.githubusercontent.com/bazixv13/hideaway/main/data/screenshots/hideaway-main.webp</image>
+    </screenshot>
+  </screenshots>
+
+  <releases>
+    <release version="1.1.2" date="2026-05-17">
+      <description>
+        <p>What's new in 1.1.2:</p>
+        <ul>
+          <li>Cleaned and sanitized all developer, translator, and contributor credits to bazixv13</li>
+        </ul>
+      </description>
+    </release>
+    <release version="1.1.1" date="2026-05-17">
+      <description>
+        <p>What's new in 1.1.1:</p>
+        <ul>
+          <li>Flathub compliance renamed application namespace to io.github.bazixv13.Hideaway</li>
+          <li>Fixed a Python scope shadowing crash when opening the About window</li>
+          <li>Optimized sandbox permissions to resolve Flatpak path reservation warnings</li>
+        </ul>
+      </description>
+    </release>
+    <release version="1.1.0" date="2026-05-17">
+      <description>
+        <p>What's new in 1.1:</p>
+        <ul>
+          <li>Live search bar — filter apps by name or filename instantly</li>
+          <li>Virtualised list for smooth scrolling with hundreds of apps</li>
+          <li>App list now loads in the background so the window opens instantly</li>
+          <li>Full Flatpak sandbox support with host filesystem access</li>
+          <li>Hardware-accelerated rendering via DRI device access</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.1.0" date="2026-05-17">
+      <description>
+        <p>Initial release of Hideaway.</p>
+      </description>
+    </release>
+  </releases>
+
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+    <control>touch</control>
+  </supports>
+
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+</component>

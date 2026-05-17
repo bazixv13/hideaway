@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <!-- Base App Background (Adwaita Dark Base) -->
+    <linearGradient id="bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#4a4a4a" />
+      <stop offset="100%" stop-color="#242424" />
+    </linearGradient>
+
+    <!-- App Gradients -->
+    <linearGradient id="win-blue" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#3584e4" />
+      <stop offset="100%" stop-color="#1c71d8" />
+    </linearGradient>
+
+    <linearGradient id="win-red" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#e01b24" />
+      <stop offset="100%" stop-color="#c01c28" />
+    </linearGradient>
+
+    <linearGradient id="win-yellow" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#f6d32d" />
+      <stop offset="100%" stop-color="#e5a50a" />
+    </linearGradient>
+  </defs>
+
+  <!-- 3D Bottom Bevel (Adwaita raised effect) -->
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="#0f0f0f" />
+
+  <!-- Base App Shape -->
+  <rect x="8" y="4" width="112" height="112" rx="24" fill="url(#bg)" />
+  
+  <!-- Subtle inner border for 3D highlight -->
+  <rect x="9" y="5" width="110" height="110" rx="23" fill="none" stroke="#ffffff" stroke-width="1" stroke-opacity="0.1" />
+
+  <!-- Main Blue App Bevel -->
+  <rect x="26" y="28" width="48" height="48" rx="10" fill="#114b98" />
+  <!-- Main Blue App -->
+  <rect x="26" y="26" width="48" height="48" rx="10" fill="url(#win-blue)" />
+  <rect x="26" y="26" width="48" height="48" rx="10" fill="none" stroke="#ffffff" stroke-width="1" stroke-opacity="0.2" />
+
+  <!-- Small Red App Bevel -->
+  <rect x="82" y="28" width="20" height="20" rx="6" fill="#801018" />
+  <!-- Small Red App -->
+  <rect x="82" y="26" width="20" height="20" rx="6" fill="url(#win-red)" />
+  <rect x="82" y="26" width="20" height="20" rx="6" fill="none" stroke="#ffffff" stroke-width="1" stroke-opacity="0.2" />
+
+  <!-- Small Yellow App Bevel -->
+  <rect x="82" y="56" width="20" height="20" rx="6" fill="#996e00" />
+  <!-- Small Yellow App -->
+  <rect x="82" y="54" width="20" height="20" rx="6" fill="url(#win-yellow)" />
+  <rect x="82" y="54" width="20" height="20" rx="6" fill="none" stroke="#ffffff" stroke-width="1" stroke-opacity="0.2" />
+
+  <!-- Dock Bevel -->
+  <rect x="26" y="88" width="76" height="12" rx="6" fill="#000000" fill-opacity="0.3" />
+  <!-- Bottom Dock -->
+  <rect x="26" y="86" width="76" height="12" rx="6" fill="#ffffff" fill-opacity="0.15" />
+  
+  <!-- Dock Dots -->
+  <circle cx="36" cy="92" r="2.5" fill="#ffffff" fill-opacity="0.7" />
+  <circle cx="50" cy="92" r="2.5" fill="#ffffff" fill-opacity="0.7" />
+  <circle cx="64" cy="92" r="2.5" fill="#ffffff" fill-opacity="0.7" />
+  <circle cx="78" cy="92" r="2.5" fill="#ffffff" fill-opacity="0.7" />
+  <circle cx="92" cy="92" r="2.5" fill="#ffffff" fill-opacity="0.7" />
+</svg>

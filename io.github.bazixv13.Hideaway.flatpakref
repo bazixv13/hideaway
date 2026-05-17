@@ -1,10 +1,7 @@
 [Flatpak Ref]
 Title=Hideaway
 Name=io.github.bazixv13.Hideaway
-Branch=master
-Url=https://bazixv13.github.io/hideaway/
+Branch=main
+Url=https://bazixv13.github.io/hideaway/repo/
 IsRuntime=false
 RuntimeRepo=https://dl.flathub.org/repo/flathub.flatpakrepo
-GPGVerify=false
-SuggestHomeScreenUrl=https://github.com/bazixv13/hideaway
-Icon=https://raw.githubusercontent.com/bazixv13/hideaway/main/data/icons/hicolor/128x128/apps/io.github.bazixv13.Hideaway.png

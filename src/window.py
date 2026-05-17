@@ -41,6 +41,7 @@ class HideawayWindow(Adw.ApplicationWindow):
     app_listbox  = Gtk.Template.Child()
     search_bar   = Gtk.Template.Child()
     search_entry = Gtk.Template.Child()
+    restart_banner = Gtk.Template.Child()
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -49,12 +50,15 @@ class HideawayWindow(Adw.ApplicationWindow):
         provider = Gtk.CssProvider()
         provider.load_from_string("""
             button.icon-edit-btn {
-                padding: 2px;
+                padding: 0px;
                 margin: 0px;
                 border-radius: 8px;
                 background: none;
                 border: none;
                 box-shadow: none;
+                min-width: 47px;
+                min-height: 47px;
+                transition: background-color 0.2s ease-in-out;
             }
             button.icon-edit-btn:hover {
                 background-color: alpha(currentColor, 0.08);
@@ -63,13 +67,19 @@ class HideawayWindow(Adw.ApplicationWindow):
                 background-color: alpha(currentColor, 0.16);
             }
             .edit-badge {
-                background-color: #3584e4;
+                background-color: #777777;
                 color: white;
                 border-radius: 50%;
-                padding: 4px;
-                margin-left: -2px;
-                margin-bottom: -2px;
+                padding: 3px;
+                margin-right: -3px;
+                margin-bottom: -3px;
                 box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+                opacity: 0.7;
+                transition: opacity 0.2s ease-in-out, background-color 0.2s ease-in-out;
+            }
+            button.icon-edit-btn:hover .edit-badge {
+                opacity: 1.0;
+                background-color: #555555;
             }
         """)
         Gtk.StyleContext.add_provider_for_display(
@@ -129,8 +139,22 @@ class HideawayWindow(Adw.ApplicationWindow):
         # Pressing Escape collapses the bar and clears the query
         self.search_entry.connect('stop-search', self._on_stop_search)
 
+        # Hook up the banner logout button
+        self.restart_banner.connect('button-clicked', self.on_logout_requested)
+
         # Load app list off the main thread so the window opens instantly
         threading.Thread(target=self._load_apps_bg, daemon=True).start()
+
+    def on_logout_requested(self, banner):
+        """Prompt the GNOME session logout dialog natively."""
+        if self.in_flatpak:
+            cmd = ['flatpak-spawn', '--host', 'gnome-session-quit', '--logout']
+        else:
+            cmd = ['gnome-session-quit', '--logout']
+        try:
+            subprocess.run(cmd, check=True)
+        except Exception as e:
+            print(f"Failed to logout: {e}")
 
     # Security helpers
 
@@ -259,16 +283,16 @@ class HideawayWindow(Adw.ApplicationWindow):
     def _create_row(self, item):
         row = Adw.ActionRow(title=item.name, subtitle=item.filename)
 
-        # Icon Gtk.Overlay with a circular pencil edit badge in the bottom-left corner
+        # Icon Gtk.Overlay with a circular pencil edit badge in the bottom-right corner
         overlay = Gtk.Overlay()
 
         icon_widget = Gtk.Image(pixel_size=40)
         self._set_image_icon(icon_widget, item.icon)
         overlay.set_child(icon_widget)
 
-        badge = Gtk.Image(icon_name="document-edit-symbolic", pixel_size=12)
+        badge = Gtk.Image(icon_name="document-edit-symbolic", pixel_size=10)
         badge.add_css_class("edit-badge")
-        badge.set_halign(Gtk.Align.START)
+        badge.set_halign(Gtk.Align.END)
         badge.set_valign(Gtk.Align.END)
         badge.set_can_target(False)  # Make badge transparent to input/clicks
         overlay.add_overlay(badge)
@@ -277,7 +301,9 @@ class HideawayWindow(Adw.ApplicationWindow):
         icon_btn.set_child(overlay)
         icon_btn.add_css_class("icon-edit-btn")
         icon_btn.set_tooltip_text(_("Change Icon"))
-        icon_btn.valign = Gtk.Align.CENTER
+        icon_btn.set_size_request(44, 44)
+        icon_btn.set_halign(Gtk.Align.CENTER)
+        icon_btn.set_valign(Gtk.Align.CENTER)
 
         # Connect clicking the icon button
         icon_btn.connect("clicked", self.on_change_icon_clicked, item, icon_widget)
@@ -602,11 +628,13 @@ class HideawayWindow(Adw.ApplicationWindow):
         preview_box.set_margin_bottom(12)
 
         preview_image = Gtk.Image(pixel_size=64)
+        preview_image.set_margin_top(24)
         self._set_image_icon(preview_image, selected_icon)
         preview_box.append(preview_image)
 
         preview_label = Gtk.Label(label=item.name)
         preview_label.add_css_class("title-4")
+        preview_label.set_margin_bottom(24)
         preview_label.set_halign(Gtk.Align.CENTER)
         preview_box.append(preview_label)
 
@@ -628,10 +656,11 @@ class HideawayWindow(Adw.ApplicationWindow):
         flowbox.set_margin_bottom(18)
 
         presets = [
-            "system-run", "utilities-terminal", "preferences-system",
-            "multimedia-video-player", "audio-x-generic", "image-x-generic",
-            "internet-web-browser", "mail-message-new", "accessories-calculator",
-            "office-calendar", "camera-photo", "emblem-favorite", "help-browser"
+            "applications-system", "applications-utilities", "applications-internet",
+            "applications-games", "applications-graphics", "applications-multimedia",
+            "applications-office", "applications-development", "applications-science",
+            "preferences-desktop", "preferences-system", "system-software-install",
+            "application-x-executable", "folder", "user-home"
         ]
 
         def select_preset(name):
@@ -764,6 +793,7 @@ class HideawayWindow(Adw.ApplicationWindow):
             # Update the item model and row image
             item.icon = icon_to_save
             self._set_image_icon(list_image, icon_to_save)
+            self.restart_banner.set_revealed(True)
 
         except GLib.Error as e:
             print(f"Error overriding icon: {e.message}")
@@ -801,4 +831,5 @@ class HideawayWindow(Adw.ApplicationWindow):
         # Update the item model and row image
         item.icon = original_icon
         self._set_image_icon(list_image, original_icon)
+        self.restart_banner.set_revealed(False)
 

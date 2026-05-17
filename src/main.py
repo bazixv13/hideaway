@@ -92,7 +92,7 @@ class HideawayApplication(Adw.Application):
             application_name=_("Hideaway"),
             application_icon="io.github.bazixv13.Hideaway",
             developer_name=_("bazixv13"),
-            version="1.2.0",
+            version="1.4.1",
             website="https://github.com/bazixv13/hideaway"
         )
         about.add_credit_section(_("Contributors"), ["bazixv13"])

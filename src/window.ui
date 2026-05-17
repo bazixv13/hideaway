@@ -42,6 +42,12 @@
             </child>
           </object>
         </child>
+        <child type="top">
+          <object class="AdwBanner" id="restart_banner">
+            <property name="title" translatable="yes">Icon changes may not be fully visible until a GNOME session restart.</property>
+            <property name="button-label" translatable="yes">Log Out</property>
+          </object>
+        </child>
         <child>
           <object class="AdwPreferencesPage">
             <child>

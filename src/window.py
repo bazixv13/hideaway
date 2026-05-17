@@ -4,7 +4,7 @@ import shutil
 import subprocess
 import threading
 import unicodedata
-from gi.repository import Gtk, Adw, Gio, GLib, GObject
+from gi.repository import Gtk, Adw, Gio, GLib, GObject, Gdk
 
 try:
     from i18n import _
@@ -44,6 +44,39 @@ class HideawayWindow(Adw.ApplicationWindow):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+
+        # Register custom CSS styles for the icon customization overlay and hover effects
+        provider = Gtk.CssProvider()
+        provider.load_from_string("""
+            button.icon-edit-btn {
+                padding: 2px;
+                margin: 0px;
+                border-radius: 8px;
+                background: none;
+                border: none;
+                box-shadow: none;
+            }
+            button.icon-edit-btn:hover {
+                background-color: alpha(currentColor, 0.08);
+            }
+            button.icon-edit-btn:active {
+                background-color: alpha(currentColor, 0.16);
+            }
+            .edit-badge {
+                background-color: #3584e4;
+                color: white;
+                border-radius: 50%;
+                padding: 4px;
+                margin-left: -2px;
+                margin-bottom: -2px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            }
+        """)
+        Gtk.StyleContext.add_provider_for_display(
+            Gdk.Display.get_default(),
+            provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
 
         self.in_flatpak = os.path.exists('/.flatpak-info')
 
@@ -147,6 +180,23 @@ class HideawayWindow(Adw.ApplicationWindow):
                     apps[filename] = info
 
         for filename, info in apps.items():
+            # Support icon/name customization persistence across restarts
+            local_path = os.path.join(self.local_dir, filename)
+            if os.path.exists(local_path):
+                keyfile = GLib.KeyFile.new()
+                try:
+                    keyfile.load_from_file(local_path, GLib.KeyFileFlags.NONE)
+                    try:
+                        info['icon'] = keyfile.get_string("Desktop Entry", "Icon")
+                    except GLib.Error:
+                        pass
+                    try:
+                        info['name'] = keyfile.get_string("Desktop Entry", "Name")
+                    except GLib.Error:
+                        pass
+                except GLib.Error:
+                    pass
+
             if self._check_is_hidden(filename):
                 info['status'] = 'hidden'
 
@@ -209,13 +259,23 @@ class HideawayWindow(Adw.ApplicationWindow):
     def _create_row(self, item):
         row = Adw.ActionRow(title=item.name, subtitle=item.filename)
 
-        # Icon Button - makes the icon clickable to trigger the picker dialog
-        icon_widget = Gtk.Image(pixel_size=32)
+        # Icon Gtk.Overlay with a circular pencil edit badge in the bottom-left corner
+        overlay = Gtk.Overlay()
+
+        icon_widget = Gtk.Image(pixel_size=40)
         self._set_image_icon(icon_widget, item.icon)
+        overlay.set_child(icon_widget)
+
+        badge = Gtk.Image(icon_name="document-edit-symbolic", pixel_size=12)
+        badge.add_css_class("edit-badge")
+        badge.set_halign(Gtk.Align.START)
+        badge.set_valign(Gtk.Align.END)
+        badge.set_can_target(False)  # Make badge transparent to input/clicks
+        overlay.add_overlay(badge)
 
         icon_btn = Gtk.Button()
-        icon_btn.set_child(icon_widget)
-        icon_btn.add_css_class("flat")
+        icon_btn.set_child(overlay)
+        icon_btn.add_css_class("icon-edit-btn")
         icon_btn.set_tooltip_text(_("Change Icon"))
         icon_btn.valign = Gtk.Align.CENTER
 

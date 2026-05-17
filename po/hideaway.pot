@@ -86,4 +86,31 @@ msgstr ""
 msgid "Failed to read backup metadata: {}"
 msgstr ""
 
+msgid "Change Icon"
+msgstr ""
+
+msgid "Change Application Icon"
+msgstr ""
+
+msgid "Select a preset icon:"
+msgstr ""
+
+msgid "Choose File…"
+msgstr ""
+
+msgid "Images (*.png, *.svg)"
+msgstr ""
+
+msgid "Select Icon Image"
+msgstr ""
+
+msgid "Reset to Default"
+msgstr ""
+
+msgid "Cancel"
+msgstr ""
+
+msgid "Apply"
+msgstr ""
+
 

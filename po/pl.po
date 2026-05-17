@@ -75,3 +75,30 @@ msgstr "Współtwórcy"
 
 msgid "Special Thanks"
 msgstr "Specjalne podziękowania"
+
+msgid "Change Icon"
+msgstr "Zmień ikonę"
+
+msgid "Change Application Icon"
+msgstr "Zmień ikonę aplikacji"
+
+msgid "Select a preset icon:"
+msgstr "Wybierz gotową ikonę:"
+
+msgid "Choose File…"
+msgstr "Wybierz plik…"
+
+msgid "Images (*.png, *.svg)"
+msgstr "Obrazy (*.png, *.svg)"
+
+msgid "Select Icon Image"
+msgstr "Wybierz obraz ikony"
+
+msgid "Reset to Default"
+msgstr "Przywróć domyślną"
+
+msgid "Cancel"
+msgstr "Anuluj"
+
+msgid "Apply"
+msgstr "Zastosuj"

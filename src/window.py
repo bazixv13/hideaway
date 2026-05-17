@@ -72,8 +72,16 @@ class HideawayWindow(Adw.ApplicationWindow):
         self.flatpak_usr_dir   = self._validated_dir(os.environ.get('APP_MANAGER_FLATPAK_USR_DIR'), default_flatpak_usr)
         self.flatpak_local_dir = self._validated_dir(os.environ.get('APP_MANAGER_FLATPAK_LOCAL_DIR'), default_flatpak_local)
 
+        if self.in_flatpak:
+            default_custom_icons = os.path.join(real_home, '.local/share/hideaway/icons')
+        else:
+            default_custom_icons = os.path.expanduser('~/.local/share/hideaway/icons')
+
+        self.custom_icons_dir = self._validated_dir(os.environ.get('APP_MANAGER_CUSTOM_ICONS_DIR'), default_custom_icons)
+
         os.makedirs(self.local_dir,  exist_ok=True)
         os.makedirs(self.backup_dir, exist_ok=True)
+        os.makedirs(self.custom_icons_dir, exist_ok=True)
 
         # Model
         self.store = Gio.ListStore(item_type=AppItem)
@@ -201,9 +209,20 @@ class HideawayWindow(Adw.ApplicationWindow):
     def _create_row(self, item):
         row = Adw.ActionRow(title=item.name, subtitle=item.filename)
 
-        # Icon — just set the name; GTK resolves it lazily when painting
-        icon_widget = Gtk.Image(icon_name=item.icon, pixel_size=32)
-        row.add_prefix(icon_widget)
+        # Icon Button - makes the icon clickable to trigger the picker dialog
+        icon_widget = Gtk.Image(pixel_size=32)
+        self._set_image_icon(icon_widget, item.icon)
+
+        icon_btn = Gtk.Button()
+        icon_btn.set_child(icon_widget)
+        icon_btn.add_css_class("flat")
+        icon_btn.set_tooltip_text(_("Change Icon"))
+        icon_btn.valign = Gtk.Align.CENTER
+
+        # Connect clicking the icon button
+        icon_btn.connect("clicked", self.on_change_icon_clicked, item, icon_widget)
+
+        row.add_prefix(icon_btn)
 
         btn = self._make_button_for_status(item.status, item, row)
         row.add_suffix(btn)
@@ -463,4 +482,263 @@ class HideawayWindow(Adw.ApplicationWindow):
                 GLib.idle_add(on_error, _("Error moving file: {}").format(e))
 
         threading.Thread(target=worker, daemon=True).start()
+
+    # Icon override & customization features
+
+    def _set_image_icon(self, image, icon_val):
+        """Set the image source robustly, handling both icon names and local paths."""
+        if not icon_val:
+            image.set_from_icon_name("application-x-executable")
+        elif icon_val.startswith('/') and os.path.exists(icon_val):
+            try:
+                image.set_from_file(icon_val)
+            except Exception:
+                image.set_from_icon_name("application-x-executable")
+        else:
+            image.set_from_icon_name(icon_val)
+
+    def _get_original_icon(self, item):
+        """Locate the read-only original system desktop entry and parse its factory default icon."""
+        search_dirs = [self.usr_dir, self.flatpak_usr_dir, self.flatpak_local_dir]
+        for d in search_dirs:
+            if not d:
+                continue
+            orig_path = os.path.join(d, item.filename)
+            if os.path.exists(orig_path):
+                keyfile = GLib.KeyFile.new()
+                try:
+                    keyfile.load_from_file(orig_path, GLib.KeyFileFlags.NONE)
+                    try:
+                        return keyfile.get_string("Desktop Entry", "Icon")
+                    except GLib.Error:
+                        pass
+                except GLib.Error:
+                    pass
+        return "application-x-executable"
+
+    def on_change_icon_clicked(self, btn, item, list_image):
+        """Build and display the premium 'Change Application Icon' dialog."""
+        dialog = Adw.Window(transient_for=self, modal=True, title=_("Change Application Icon"))
+        dialog.set_default_size(360, 500)
+
+        # Root layout box
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        dialog.set_content(vbox)
+
+        # Header bar with Actions
+        header = Adw.HeaderBar()
+        vbox.append(header)
+
+        # State tracking
+        selected_icon = item.icon
+        original_icon = self._get_original_icon(item)
+
+        # Preview layout card
+        preview_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        preview_box.add_css_class("card")
+        preview_box.set_margin_start(18)
+        preview_box.set_margin_end(18)
+        preview_box.set_margin_top(18)
+        preview_box.set_margin_bottom(12)
+
+        preview_image = Gtk.Image(pixel_size=64)
+        self._set_image_icon(preview_image, selected_icon)
+        preview_box.append(preview_image)
+
+        preview_label = Gtk.Label(label=item.name)
+        preview_label.add_css_class("title-4")
+        preview_label.set_halign(Gtk.Align.CENTER)
+        preview_box.append(preview_label)
+
+        vbox.append(preview_box)
+
+        # Preset grid
+        grid_label = Gtk.Label(label=_("Select a preset icon:"), xalign=0.0)
+        grid_label.set_margin_start(18)
+        grid_label.set_margin_bottom(6)
+        vbox.append(grid_label)
+
+        flowbox = Gtk.FlowBox()
+        flowbox.set_valign(Gtk.Align.START)
+        flowbox.set_max_children_per_line(5)
+        flowbox.set_min_children_per_line(5)
+        flowbox.set_selection_mode(Gtk.SelectionMode.NONE)
+        flowbox.set_margin_start(18)
+        flowbox.set_margin_end(18)
+        flowbox.set_margin_bottom(18)
+
+        presets = [
+            "system-run", "utilities-terminal", "preferences-system",
+            "multimedia-video-player", "audio-x-generic", "image-x-generic",
+            "internet-web-browser", "mail-message-new", "accessories-calculator",
+            "office-calendar", "camera-photo", "emblem-favorite", "help-browser"
+        ]
+
+        def select_preset(name):
+            nonlocal selected_icon
+            selected_icon = name
+            self._set_image_icon(preview_image, selected_icon)
+
+        for name in presets:
+            btn_preset = Gtk.Button()
+            btn_preset.add_css_class("flat")
+            btn_preset.set_child(Gtk.Image(icon_name=name, pixel_size=32))
+            btn_preset.connect("clicked", lambda b, n=name: select_preset(n))
+            flowbox.append(btn_preset)
+
+        vbox.append(flowbox)
+
+        # Choose File button
+        file_btn = Gtk.Button(label=_("Choose File…"))
+        file_btn.set_icon_name("folder-open-symbolic")
+        file_btn.set_margin_start(18)
+        file_btn.set_margin_end(18)
+        file_btn.set_margin_bottom(8)
+
+        def on_choose_file(b):
+            file_dialog = Gtk.FileDialog()
+            filters = Gio.ListStore(item_type=Gtk.FileFilter)
+
+            img_filter = Gtk.FileFilter()
+            img_filter.set_name(_("Images (*.png, *.svg)"))
+            img_filter.add_mime_type("image/png")
+            img_filter.add_mime_type("image/svg+xml")
+            filters.append(img_filter)
+
+            file_dialog.set_filters(filters)
+            file_dialog.set_title(_("Select Icon Image"))
+
+            def on_file_selected(dialog_obj, result):
+                try:
+                    f = dialog_obj.open_finish(result)
+                    if f:
+                        path = f.get_path()
+                        nonlocal selected_icon
+                        selected_icon = path
+                        self._set_image_icon(preview_image, selected_icon)
+                except Exception as e:
+                    print(f"Error selecting file: {e}")
+
+            file_dialog.open(dialog, None, on_file_selected)
+
+        file_btn.connect("clicked", on_choose_file)
+        vbox.append(file_btn)
+
+        # Reset button
+        reset_btn = Gtk.Button(label=_("Reset to Default"))
+        reset_btn.set_margin_start(18)
+        reset_btn.set_margin_end(18)
+        reset_btn.set_margin_bottom(18)
+
+        def on_reset(b):
+            nonlocal selected_icon
+            selected_icon = original_icon
+            self._set_image_icon(preview_image, selected_icon)
+
+        reset_btn.connect("clicked", on_reset)
+        vbox.append(reset_btn)
+
+        # Top Header Bar Buttons
+        cancel_btn = Gtk.Button(label=_("Cancel"))
+        cancel_btn.connect("clicked", lambda b: dialog.close())
+        header.pack_start(cancel_btn)
+
+        apply_btn = Gtk.Button(label=_("Apply"))
+        apply_btn.add_css_class("suggested-action")
+
+        def on_apply(b):
+            self._apply_icon_change(item, selected_icon, original_icon, list_image)
+            dialog.close()
+
+        apply_btn.connect("clicked", on_apply)
+        header.pack_end(apply_btn)
+
+        dialog.present()
+
+    def _apply_icon_change(self, item, new_icon, original_icon, list_image):
+        """Create a local user desktop file overriding the Icon key natively without root."""
+        import time
+
+        # 1. Reset to default if user chose the original factory icon
+        if new_icon == original_icon:
+            self._reset_icon_override(item, list_image)
+            return
+
+        # 2. Check if selected icon is a custom local file path
+        icon_to_save = new_icon
+        if new_icon.startswith('/') and os.path.exists(new_icon):
+            try:
+                os.makedirs(self.custom_icons_dir, exist_ok=True)
+                ext = os.path.splitext(new_icon)[1].lower()
+                if not ext:
+                    ext = '.png'
+                dest_filename = f"{os.path.splitext(item.filename)[0]}_{int(time.time())}{ext}"
+                dest_path = os.path.join(self.custom_icons_dir, dest_filename)
+
+                shutil.copy2(new_icon, dest_path)
+                icon_to_save = dest_path
+            except Exception as e:
+                print(f"Error copying custom icon: {e}")
+
+        # 3. Create or modify the local override desktop entry
+        local_path = os.path.join(self.local_dir, item.filename)
+
+        try:
+            keyfile = GLib.KeyFile.new()
+            if os.path.exists(local_path):
+                keyfile.load_from_file(local_path, GLib.KeyFileFlags.NONE)
+            else:
+                if os.path.exists(item.path):
+                    shutil.copy2(item.path, local_path)
+                    keyfile.load_from_file(local_path, GLib.KeyFileFlags.NONE)
+                else:
+                    keyfile.set_string("Desktop Entry", "Type", "Application")
+                    keyfile.set_string("Desktop Entry", "Name", item.name)
+
+            # Set the icon override
+            keyfile.set_string("Desktop Entry", "Icon", icon_to_save)
+
+            # Write out to directory
+            keyfile.save_to_file(local_path)
+
+            # Update the item model and row image
+            item.icon = icon_to_save
+            self._set_image_icon(list_image, icon_to_save)
+
+        except GLib.Error as e:
+            print(f"Error overriding icon: {e.message}")
+
+    def _reset_icon_override(self, item, list_image):
+        """Remove the local desktop entry or remove its Icon key to restore original factory icon."""
+        local_path = os.path.join(self.local_dir, item.filename)
+        original_icon = self._get_original_icon(item)
+
+        if os.path.exists(local_path):
+            try:
+                keyfile = GLib.KeyFile.new()
+                keyfile.load_from_file(local_path, GLib.KeyFileFlags.NONE)
+
+                try:
+                    keyfile.remove_key("Desktop Entry", "Icon")
+                except GLib.Error:
+                    pass
+
+                # If the desktop file was only used for icon overriding, delete it entirely!
+                has_no_display = False
+                try:
+                    has_no_display = keyfile.get_boolean("Desktop Entry", "NoDisplay")
+                except GLib.Error:
+                    pass
+
+                if not has_no_display:
+                    os.remove(local_path)
+                else:
+                    keyfile.save_to_file(local_path)
+
+            except GLib.Error as e:
+                print(f"Error resetting icon: {e.message}")
+
+        # Update the item model and row image
+        item.icon = original_icon
+        self._set_image_icon(list_image, original_icon)
 

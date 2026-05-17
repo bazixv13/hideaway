@@ -53,6 +53,16 @@
   </screenshots>
 
   <releases>
+    <release version="1.2.0" date="2026-05-17">
+      <description>
+        <p>What's new in 1.2.0:</p>
+        <ul>
+          <li>Added complete system and user Flatpak application management</li>
+          <li>Optimized backup and restore engines to perfectly handle symlinks and resolve relative path breaks</li>
+          <li>Synchronized sandboxing permissions to allow reading Flatpaks and loading icons directly from host exports</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.1.2" date="2026-05-17">
       <description>
         <p>What's new in 1.1.2:</p>

@@ -23,13 +23,15 @@ class AppItem(GObject.Object):
     filename = GObject.Property(type=str, default='')
     icon     = GObject.Property(type=str, default='application-x-executable')
     status   = GObject.Property(type=str, default='installed')  # installed | hidden | backed_up
+    path     = GObject.Property(type=str, default='')
 
-    def __init__(self, name, filename, icon, status):
+    def __init__(self, name, filename, icon, status, path=''):
         super().__init__()
         self.name     = name
         self.filename = filename
         self.icon     = icon
         self.status   = status
+        self.path     = path
 
 
 @Gtk.Template(filename=os.path.join(os.path.dirname(__file__), 'window.ui'))
@@ -60,6 +62,15 @@ class HideawayWindow(Adw.ApplicationWindow):
         self.usr_dir    = self._validated_dir(os.environ.get('APP_MANAGER_USR_DIR'),    default_usr)
         self.local_dir  = self._validated_dir(os.environ.get('APP_MANAGER_LOCAL_DIR'),  default_local)
         self.backup_dir = self._validated_dir(os.environ.get('APP_MANAGER_BACKUP_DIR'), default_backup)
+
+        default_flatpak_usr = '/var/lib/flatpak/exports/share/applications'
+        if self.in_flatpak:
+            default_flatpak_local = os.path.join(real_home, '.local/share/flatpak/exports/share/applications')
+        else:
+            default_flatpak_local = os.path.expanduser('~/.local/share/flatpak/exports/share/applications')
+
+        self.flatpak_usr_dir   = self._validated_dir(os.environ.get('APP_MANAGER_FLATPAK_USR_DIR'), default_flatpak_usr)
+        self.flatpak_local_dir = self._validated_dir(os.environ.get('APP_MANAGER_FLATPAK_LOCAL_DIR'), default_flatpak_local)
 
         os.makedirs(self.local_dir,  exist_ok=True)
         os.makedirs(self.backup_dir, exist_ok=True)
@@ -106,16 +117,25 @@ class HideawayWindow(Adw.ApplicationWindow):
         """Scan desktop dirs on a worker thread, then push results to UI."""
         apps = {}
 
+        scan_dirs = []
         if os.path.exists(self.usr_dir):
-            for filename in os.listdir(self.usr_dir):
+            scan_dirs.append(self.usr_dir)
+        if os.path.exists(self.flatpak_usr_dir):
+            scan_dirs.append(self.flatpak_usr_dir)
+        if os.path.exists(self.flatpak_local_dir):
+            scan_dirs.append(self.flatpak_local_dir)
+
+        for directory in scan_dirs:
+            for filename in os.listdir(directory):
                 if not _SAFE_FILENAME_RE.match(filename):
                     continue  # skip files with suspicious names
-                path = self._safe_join(self.usr_dir, filename)
+                path = self._safe_join(directory, filename)
                 if not path:
                     continue
                 info = self._parse_desktop(path)
                 if info:
                     info['status'] = 'installed'
+                    info['path'] = path
                     apps[filename] = info
 
         for filename, info in apps.items():
@@ -132,6 +152,7 @@ class HideawayWindow(Adw.ApplicationWindow):
                 info = self._parse_desktop(path)
                 if info:
                     info['status'] = 'backed_up'
+                    info['path'] = path
                     apps[filename] = info
 
         sorted_apps = sorted(apps.values(), key=lambda x: x['name'].lower())
@@ -140,7 +161,7 @@ class HideawayWindow(Adw.ApplicationWindow):
     def _populate_store(self, app_list):
         self.store.remove_all()
         items = [
-            AppItem(a['name'], a['filename'], a['icon'], a['status'])
+            AppItem(a['name'], a['filename'], a['icon'], a['status'], a.get('path', ''))
             for a in app_list
         ]
         self.store.splice(0, 0, items)
@@ -259,22 +280,34 @@ class HideawayWindow(Adw.ApplicationWindow):
     def on_remove(self, button, item, row):
         use_deletion = self.get_application().use_file_deletion
 
+        src  = item.path
+        if not src:
+            self.show_error(_("Invalid source path — operation aborted."))
+            return
+
+        is_safe = False
+        for allowed_dir in [self.usr_dir, self.flatpak_usr_dir, self.flatpak_local_dir]:
+            if src.startswith(os.path.normpath(allowed_dir) + os.sep):
+                is_safe = True
+                break
+        if not is_safe:
+            self.show_error(_("Invalid source path — operation aborted."))
+            return
+
         if use_deletion:
-            src  = self._safe_join(self.usr_dir, item.filename)
             dest = self._safe_join(self.backup_dir, item.filename)
-            if not src or not dest:
+            if not dest:
                 self.show_error(_("Invalid filename — operation aborted."))
                 return
             if not os.path.exists(dest):
-                self._move_file_async(
+                self._backup_file_and_remove_src(
                     src, dest,
                     on_success=lambda: self._swap_button(row, button, _("Restore (Moved)"), "suggested-action", self.on_restore_moved, item),
                     on_error=lambda msg: self.show_error(msg),
                 )
         else:
-            src  = self._safe_join(self.usr_dir, item.filename)
             dest = self._safe_join(self.local_dir, item.filename)
-            if not src or not dest:
+            if not dest:
                 self.show_error(_("Invalid filename — operation aborted."))
                 return
             try:
@@ -282,7 +315,8 @@ class HideawayWindow(Adw.ApplicationWindow):
                 try:
                     fd = os.open(dest, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
                     os.close(fd)
-                    shutil.copy2(src, dest)
+                    real_src = os.path.realpath(src)
+                    shutil.copy2(real_src, dest)
                 except FileExistsError:
                     pass  # already copied from a previous hide; just update NoDisplay
                 keyfile = GLib.KeyFile.new()
@@ -308,42 +342,125 @@ class HideawayWindow(Adw.ApplicationWindow):
         self._swap_button(row, button, _("Remove"), "destructive-action", self.on_remove, item)
 
     def on_restore_moved(self, button, item, row):
-        src  = self._safe_join(self.backup_dir, item.filename)
-        dest = self._safe_join(self.usr_dir, item.filename)
-        if not src or not dest:
+        src = self._safe_join(self.backup_dir, item.filename)
+        if not src:
             self.show_error(_("Invalid filename — operation aborted."))
             return
-        self._move_file_async(
-            src, dest,
+        try:
+            keyfile = GLib.KeyFile.new()
+            keyfile.load_from_file(src, GLib.KeyFileFlags.NONE)
+            original_path = keyfile.get_string("Desktop Entry", "X-Hideaway-Original-Path")
+            try:
+                symlink_target = keyfile.get_string("Desktop Entry", "X-Hideaway-Symlink-Target")
+            except GLib.Error:
+                symlink_target = None
+        except Exception as e:
+            self.show_error(_("Failed to read backup metadata: {}").format(e))
+            return
+
+        self._restore_file_async(
+            src, original_path, symlink_target,
             on_success=lambda: self._swap_button(row, button, _("Remove"), "destructive-action", self.on_remove, item),
             on_error=lambda msg: self.show_error(msg),
         )
 
-    # Privileged file moves
+    # Privileged file moves and backups
 
-    def _move_file_async(self, src, dest, on_success, on_error):
-        needs_root = '/usr/share' in src or '/usr/share' in dest \
-                  or '/var/run/host/usr' in src or '/var/run/host/usr' in dest
-
-        if needs_root:
-            def worker():
-                try:
-                    if self.in_flatpak:
-                        host_src  = src.replace('/var/run/host', '')  if src.startswith('/var/run/host')  else src
-                        host_dest = dest.replace('/var/run/host', '') if dest.startswith('/var/run/host') else dest
-                        cmd = ['flatpak-spawn', '--host', 'pkexec', 'mv', host_src, host_dest]
-                    else:
-                        cmd = ['pkexec', 'mv', src, dest]
-                    subprocess.run(cmd, check=True)
-                    GLib.idle_add(on_success)
-                except subprocess.CalledProcessError:
-                    GLib.idle_add(on_error, _("Authentication failed or was cancelled."))
-                except Exception as e:
-                    GLib.idle_add(on_error, _("Error moving file: {}").format(e))
-            threading.Thread(target=worker, daemon=True).start()
-        else:
+    def _backup_file_and_remove_src(self, src, dest, on_success, on_error):
+        def worker():
             try:
-                shutil.move(src, dest)
-                on_success()
+                # 1. Read and parse original desktop file (from the resolved real path)
+                keyfile = GLib.KeyFile.new()
+                real_src = os.path.realpath(src)
+                keyfile.load_from_file(real_src, GLib.KeyFileFlags.NONE)
+
+                # 2. Add metadata
+                keyfile.set_string("Desktop Entry", "X-Hideaway-Original-Path", src)
+                if os.path.islink(src):
+                    symlink_target = os.readlink(src)
+                    keyfile.set_string("Desktop Entry", "X-Hideaway-Symlink-Target", symlink_target)
+
+                # 3. Write to backup directory (which is user-writable)
+                os.makedirs(os.path.dirname(dest), exist_ok=True)
+                keyfile.save_to_file(dest)
+
+                # 4. Remove original file (requires root if in system dir)
+                needs_root = ('/usr/share' in src or
+                              '/var/run/host/usr' in src or
+                              '/var/lib/flatpak' in src or
+                              '/var/run/host/var/lib/flatpak' in src)
+
+                if needs_root:
+                    if self.in_flatpak:
+                        host_src = src.replace('/var/run/host', '') if src.startswith('/var/run/host') else src
+                        cmd = ['flatpak-spawn', '--host', 'pkexec', 'rm', '-f', host_src]
+                    else:
+                        cmd = ['pkexec', 'rm', '-f', src]
+                    subprocess.run(cmd, check=True)
+                else:
+                    os.remove(src)
+
+                GLib.idle_add(on_success)
+            except subprocess.CalledProcessError:
+                if os.path.exists(dest):
+                    try:
+                        os.remove(dest)
+                    except Exception:
+                        pass
+                GLib.idle_add(on_error, _("Authentication failed or was cancelled."))
             except Exception as e:
-                on_error(_("Error moving file: {}").format(e))
+                if os.path.exists(dest):
+                    try:
+                        os.remove(dest)
+                    except Exception:
+                        pass
+                GLib.idle_add(on_error, _("Error moving file: {}").format(e))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _restore_file_async(self, backup_path, original_path, symlink_target, on_success, on_error):
+        def worker():
+            try:
+                needs_root = ('/usr/share' in original_path or
+                              '/var/run/host/usr' in original_path or
+                              '/var/lib/flatpak' in original_path or
+                              '/var/run/host/var/lib/flatpak' in original_path)
+
+                if symlink_target:
+                    # Restore as a symlink
+                    if needs_root:
+                        if self.in_flatpak:
+                            host_orig = original_path.replace('/var/run/host', '') if original_path.startswith('/var/run/host') else original_path
+                            cmd = ['flatpak-spawn', '--host', 'pkexec', 'ln', '-sf', symlink_target, host_orig]
+                        else:
+                            cmd = ['pkexec', 'ln', '-sf', symlink_target, original_path]
+                        subprocess.run(cmd, check=True)
+                    else:
+                        os.makedirs(os.path.dirname(original_path), exist_ok=True)
+                        if os.path.exists(original_path) or os.path.islink(original_path):
+                            os.remove(original_path)
+                        os.symlink(symlink_target, original_path)
+                else:
+                    # Restore as a regular file by moving the backup file
+                    if needs_root:
+                        if self.in_flatpak:
+                            host_orig = original_path.replace('/var/run/host', '') if original_path.startswith('/var/run/host') else original_path
+                            cmd = ['flatpak-spawn', '--host', 'pkexec', 'mv', backup_path, host_orig]
+                        else:
+                            cmd = ['pkexec', 'mv', backup_path, original_path]
+                        subprocess.run(cmd, check=True)
+                    else:
+                        os.makedirs(os.path.dirname(original_path), exist_ok=True)
+                        shutil.move(backup_path, original_path)
+
+                if symlink_target and os.path.exists(backup_path):
+                    os.remove(backup_path)
+
+                GLib.idle_add(on_success)
+            except subprocess.CalledProcessError:
+                GLib.idle_add(on_error, _("Authentication failed or was cancelled."))
+            except Exception as e:
+                GLib.idle_add(on_error, _("Error moving file: {}").format(e))
+
+        threading.Thread(target=worker, daemon=True).start()
+

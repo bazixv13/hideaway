@@ -58,13 +58,19 @@ class HideawayApplication(Adw.Application):
             base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             icon_theme.add_search_path(os.path.join(base_dir, 'data', 'icons'))
             
+            real_home = os.environ.get('HOME', '')
+            if '.var/app' in real_home:
+                real_home = real_home.split('.var/app')[0].rstrip('/')
+            else:
+                real_home = os.path.expanduser('~')
+
+            # Register Flatpak icon export search paths
+            icon_theme.add_search_path('/var/lib/flatpak/exports/share/icons')
+            icon_theme.add_search_path(os.path.join(real_home, '.local/share/flatpak/exports/share/icons'))
+            
             if os.path.exists('/.flatpak-info'):
                 icon_theme.add_search_path('/var/run/host/usr/share/icons')
                 icon_theme.add_search_path('/var/run/host/usr/share/pixmaps')
-                
-                real_home = os.environ.get('HOME', '')
-                if '.var/app' in real_home:
-                    real_home = real_home.split('.var/app')[0].rstrip('/')
                 icon_theme.add_search_path(os.path.join(real_home, '.local/share/icons'))
                 icon_theme.add_search_path(os.path.join(real_home, '.icons'))
 
@@ -86,7 +92,7 @@ class HideawayApplication(Adw.Application):
             application_name=_("Hideaway"),
             application_icon="io.github.bazixv13.Hideaway",
             developer_name=_("bazixv13"),
-            version="1.1.2",
+            version="1.2.0",
             website="https://github.com/bazixv13/hideaway"
         )
         about.add_credit_section(_("Contributors"), ["bazixv13"])

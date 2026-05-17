@@ -21,6 +21,8 @@
         "--socket=wayland",
         "--filesystem=host-os",
         "--filesystem=~/.local/share/applications",
+        "--filesystem=~/.local/share/flatpak",
+        "--filesystem=/var/lib/flatpak",
         "--filesystem=~/.local/share/hideaway",
         "--filesystem=~/.local/share/icons:ro",
         "--filesystem=xdg-config/hideaway",
@@ -41,7 +43,7 @@
                 {
                     "type": "git",
                     "url": "https://github.com/bazixv13/hideaway.git",
-                    "tag": "v1.1.2"
+                    "tag": "v1.2.0"
                 }
             ]
         }

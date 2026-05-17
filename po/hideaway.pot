@@ -80,3 +80,10 @@ msgstr ""
 msgid "Special Thanks"
 msgstr ""
 
+msgid "Invalid source path — operation aborted."
+msgstr ""
+
+msgid "Failed to read backup metadata: {}"
+msgstr ""
+
+

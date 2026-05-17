@@ -38,10 +38,10 @@ msgid "Removal Behavior"
 msgstr "Sposób usuwania"
 
 msgid "Choose how applications are removed from the overview."
-msgstr "Wybierz sposób usuwania aplikacji z podglądu."
+msgstr "Wybierz sposób usuwania aplikacji z menu aplikacji."
 
 msgid "Use File Deletion"
-msgstr "Użyj usuwania plików"
+msgstr "Usuwaj pliki"
 
 msgid "Instead of hiding, move files to the backup directory. Requires root."
 msgstr "Zamiast ukrywać, przenieś pliki do katalogu kopii zapasowej. Wymaga uprawnień roota."

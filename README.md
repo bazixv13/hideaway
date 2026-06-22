@@ -3,7 +3,7 @@
   <h1>Hideaway</h1>
 </div>
 
-Hideaway is a small libadwaita app that allows you to remove elements from your gnome app list.
+Hideaway is a small libadwaita app that allows you to remove elements from your gnome app list(overview).
 
 ## Running from source
 If you just want to test it out directly from the source:

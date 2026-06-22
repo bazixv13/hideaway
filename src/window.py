@@ -182,6 +182,7 @@ class HideawayWindow(Adw.ApplicationWindow):
         """Scan desktop dirs on a worker thread, then push results to UI."""
         apps = {}
 
+        # 1. Scan system / flatpak application directories first
         scan_dirs = []
         if os.path.exists(self.usr_dir):
             scan_dirs.append(self.usr_dir)
@@ -197,14 +198,46 @@ class HideawayWindow(Adw.ApplicationWindow):
                 path = self._safe_join(directory, filename)
                 if not path:
                     continue
-                info = self._parse_desktop(path)
+                info = self._parse_desktop(path, allow_hidden=False)
                 if info:
                     info['status'] = 'installed'
                     info['path'] = path
                     apps[filename] = info
 
+        # 2. Scan local applications directory (~/.local/share/applications) last
+        if os.path.exists(self.local_dir):
+            for filename in os.listdir(self.local_dir):
+                if filename == "io.github.bazixv13.Hideaway.desktop":
+                    continue
+                if not _SAFE_FILENAME_RE.match(filename):
+                    continue
+                if filename in apps:
+                    # Skip overrides, handled by the loop below
+                    continue
+                path = self._safe_join(self.local_dir, filename)
+                if not path:
+                    continue
+                info = self._parse_desktop(path, allow_hidden=True)
+                if info:
+                    info['path'] = path
+                    # Determine hidden status
+                    is_hidden = False
+                    try:
+                        keyfile = GLib.KeyFile.new()
+                        keyfile.load_from_file(path, GLib.KeyFileFlags.NONE)
+                        is_hidden = keyfile.get_boolean("Desktop Entry", "NoDisplay")
+                    except GLib.Error:
+                        pass
+                    
+                    info['status'] = 'hidden' if is_hidden else 'installed'
+                    apps[filename] = info
+
+        # 3. Apply custom icons, names, and hidden status overrides for system apps
         for filename, info in apps.items():
-            # Support icon/name customization persistence across restarts
+            if info['path'].startswith(self.local_dir):
+                # Native local apps are already read directly from their only source
+                continue
+
             local_path = os.path.join(self.local_dir, filename)
             if os.path.exists(local_path):
                 keyfile = GLib.KeyFile.new()
@@ -224,6 +257,7 @@ class HideawayWindow(Adw.ApplicationWindow):
             if self._check_is_hidden(filename):
                 info['status'] = 'hidden'
 
+        # 4. Scan backups for moved apps
         if os.path.exists(self.backup_dir):
             for filename in os.listdir(self.backup_dir):
                 if not _SAFE_FILENAME_RE.match(filename):
@@ -231,7 +265,7 @@ class HideawayWindow(Adw.ApplicationWindow):
                 path = self._safe_join(self.backup_dir, filename)
                 if not path:
                     continue
-                info = self._parse_desktop(path)
+                info = self._parse_desktop(path, allow_hidden=True)
                 if info:
                     info['status'] = 'backed_up'
                     info['path'] = path
@@ -332,17 +366,18 @@ class HideawayWindow(Adw.ApplicationWindow):
 
     # Desktop file parsing helpers
 
-    def _parse_desktop(self, path):
+    def _parse_desktop(self, path, allow_hidden=False):
         keyfile = GLib.KeyFile.new()
         try:
             keyfile.load_from_file(path, GLib.KeyFileFlags.NONE)
             if not keyfile.has_group("Desktop Entry"):
                 return None
-            try:
-                if keyfile.get_boolean("Desktop Entry", "NoDisplay"):
-                    return None
-            except GLib.Error:
-                pass
+            if not allow_hidden:
+                try:
+                    if keyfile.get_boolean("Desktop Entry", "NoDisplay"):
+                        return None
+                except GLib.Error:
+                    pass
             try:
                 name = keyfile.get_string("Desktop Entry", "Name")
             except GLib.Error:
@@ -391,8 +426,8 @@ class HideawayWindow(Adw.ApplicationWindow):
             return
 
         is_safe = False
-        for allowed_dir in [self.usr_dir, self.flatpak_usr_dir, self.flatpak_local_dir]:
-            if src.startswith(os.path.normpath(allowed_dir) + os.sep):
+        for allowed_dir in [self.usr_dir, self.flatpak_usr_dir, self.flatpak_local_dir, self.local_dir]:
+            if src.startswith(os.path.normpath(allowed_dir) + os.sep) or src == os.path.normpath(os.path.join(allowed_dir, item.filename)):
                 is_safe = True
                 break
         if not is_safe:
@@ -440,7 +475,62 @@ class HideawayWindow(Adw.ApplicationWindow):
             return
         try:
             if os.path.exists(dest):
-                os.remove(dest)
+                is_system_app = False
+                for d in [self.usr_dir, self.flatpak_usr_dir, self.flatpak_local_dir]:
+                    if os.path.exists(os.path.join(d, item.filename)):
+                        is_system_app = True
+                        break
+
+                if is_system_app:
+                    keyfile = GLib.KeyFile.new()
+                    keyfile.load_from_file(dest, GLib.KeyFileFlags.NONE)
+
+                    original_icon = self._get_original_icon(item)
+
+                    current_icon = None
+                    try:
+                        current_icon = keyfile.get_string("Desktop Entry", "Icon")
+                    except GLib.Error:
+                        pass
+                    
+                    has_custom_icon = (current_icon is not None) and (current_icon != original_icon)
+
+                    current_name = None
+                    try:
+                        current_name = keyfile.get_string("Desktop Entry", "Name")
+                    except GLib.Error:
+                        pass
+
+                    original_name = None
+                    for d in [self.usr_dir, self.flatpak_usr_dir, self.flatpak_local_dir]:
+                        orig_path = os.path.join(d, item.filename)
+                        if os.path.exists(orig_path):
+                            orig_kf = GLib.KeyFile.new()
+                            try:
+                                orig_kf.load_from_file(orig_path, GLib.KeyFileFlags.NONE)
+                                original_name = orig_kf.get_string("Desktop Entry", "Name")
+                                break
+                            except GLib.Error:
+                                pass
+
+                    has_custom_name = (current_name is not None) and (current_name != original_name)
+                    
+                    if not has_custom_icon and not has_custom_name:
+                        os.remove(dest)
+                    else:
+                        try:
+                            keyfile.remove_key("Desktop Entry", "NoDisplay")
+                        except GLib.Error:
+                            keyfile.set_boolean("Desktop Entry", "NoDisplay", False)
+                        keyfile.save_to_file(dest)
+                else:
+                    keyfile = GLib.KeyFile.new()
+                    keyfile.load_from_file(dest, GLib.KeyFileFlags.NONE)
+                    try:
+                        keyfile.remove_key("Desktop Entry", "NoDisplay")
+                    except GLib.Error:
+                        keyfile.set_boolean("Desktop Entry", "NoDisplay", False)
+                    keyfile.save_to_file(dest)
         except Exception as e:
             self.show_error(_("Failed to restore: {}").format(e))
             return
@@ -585,6 +675,20 @@ class HideawayWindow(Adw.ApplicationWindow):
 
     def _get_original_icon(self, item):
         """Locate the read-only original system desktop entry and parse its factory default icon."""
+        # 1. First, check if there is a saved original icon in the local desktop entry
+        local_path = os.path.join(self.local_dir, item.filename)
+        if os.path.exists(local_path):
+            keyfile = GLib.KeyFile.new()
+            try:
+                keyfile.load_from_file(local_path, GLib.KeyFileFlags.NONE)
+                try:
+                    return keyfile.get_string("Desktop Entry", "X-Hideaway-Original-Icon")
+                except GLib.Error:
+                    pass
+            except GLib.Error:
+                pass
+
+        # 2. Otherwise search standard system/flatpak directories
         search_dirs = [self.usr_dir, self.flatpak_usr_dir, self.flatpak_local_dir]
         for d in search_dirs:
             if not d:
@@ -784,6 +888,26 @@ class HideawayWindow(Adw.ApplicationWindow):
                     keyfile.set_string("Desktop Entry", "Type", "Application")
                     keyfile.set_string("Desktop Entry", "Name", item.name)
 
+            # Backup original icon if this is a local app
+            is_system_app = False
+            for d in [self.usr_dir, self.flatpak_usr_dir, self.flatpak_local_dir]:
+                if os.path.exists(os.path.join(d, item.filename)):
+                    is_system_app = True
+                    break
+            if not is_system_app:
+                has_orig_icon = False
+                try:
+                    keyfile.get_string("Desktop Entry", "X-Hideaway-Original-Icon")
+                    has_orig_icon = True
+                except GLib.Error:
+                    pass
+                if not has_orig_icon:
+                    try:
+                        orig_icon = keyfile.get_string("Desktop Entry", "Icon")
+                        keyfile.set_string("Desktop Entry", "X-Hideaway-Original-Icon", orig_icon)
+                    except GLib.Error:
+                        pass
+
             # Set the icon override
             keyfile.set_string("Desktop Entry", "Icon", icon_to_save)
 
@@ -808,21 +932,56 @@ class HideawayWindow(Adw.ApplicationWindow):
                 keyfile = GLib.KeyFile.new()
                 keyfile.load_from_file(local_path, GLib.KeyFileFlags.NONE)
 
-                try:
-                    keyfile.remove_key("Desktop Entry", "Icon")
-                except GLib.Error:
-                    pass
+                # Check if it is a system app
+                is_system_app = False
+                for d in [self.usr_dir, self.flatpak_usr_dir, self.flatpak_local_dir]:
+                    if os.path.exists(os.path.join(d, item.filename)):
+                        is_system_app = True
+                        break
 
-                # If the desktop file was only used for icon overriding, delete it entirely!
-                has_no_display = False
-                try:
-                    has_no_display = keyfile.get_boolean("Desktop Entry", "NoDisplay")
-                except GLib.Error:
-                    pass
+                if is_system_app:
+                    try:
+                        keyfile.remove_key("Desktop Entry", "Icon")
+                    except GLib.Error:
+                        pass
 
-                if not has_no_display:
-                    os.remove(local_path)
+                    has_no_display = False
+                    try:
+                        has_no_display = keyfile.get_boolean("Desktop Entry", "NoDisplay")
+                    except GLib.Error:
+                        pass
+
+                    current_name = None
+                    try:
+                        current_name = keyfile.get_string("Desktop Entry", "Name")
+                    except GLib.Error:
+                        pass
+
+                    original_name = None
+                    for d in [self.usr_dir, self.flatpak_usr_dir, self.flatpak_local_dir]:
+                        orig_path = os.path.join(d, item.filename)
+                        if os.path.exists(orig_path):
+                            orig_kf = GLib.KeyFile.new()
+                            try:
+                                orig_kf.load_from_file(orig_path, GLib.KeyFileFlags.NONE)
+                                original_name = orig_kf.get_string("Desktop Entry", "Name")
+                                break
+                            except GLib.Error:
+                                pass
+
+                    has_custom_name = (current_name is not None) and (current_name != original_name)
+
+                    if not has_no_display and not has_custom_name:
+                        os.remove(local_path)
+                    else:
+                        keyfile.save_to_file(local_path)
                 else:
+                    # Native local app: restore icon to original and clean up backup key
+                    keyfile.set_string("Desktop Entry", "Icon", original_icon)
+                    try:
+                        keyfile.remove_key("Desktop Entry", "X-Hideaway-Original-Icon")
+                    except GLib.Error:
+                        pass
                     keyfile.save_to_file(local_path)
 
             except GLib.Error as e:

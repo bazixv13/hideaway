@@ -53,6 +53,15 @@
   </screenshots>
 
   <releases>
+    <release version="1.4.3" date="2026-11-14">
+      <description>
+        <p>What's new in 1.4.3:</p>
+        <ul>
+          <li>Redesigned app icon to follow the GNOME Human Interface Guidelines</li>
+          <li>Added a symbolic icon variant for small sizes and symbolic contexts</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.4.2" date="2026-06-22">
       <description>
         <p>What's new in 1.4.2:</p>

@@ -14,6 +14,11 @@ install_data(
 )
 
 install_data(
+  'icons/hicolor/symbolic/apps/io.github.bazixv13.Hideaway-symbolic.svg',
+  install_dir: join_paths(get_option('datadir'), 'icons/hicolor/symbolic/apps')
+)
+
+install_data(
   'icons/hicolor/128x128/apps/io.github.bazixv13.Hideaway.png',
   install_dir: join_paths(get_option('datadir'), 'icons/hicolor/128x128/apps')
 )

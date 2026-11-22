@@ -1,0 +1,43 @@
+name: Ask the Flatpak repo to publish
+
+# The Flatpak repository rebuilds on a six-hour schedule. This asks it to
+# rebuild now, so a fresh tag reaches `flatpak update` in a minute or two
+# instead of hours later.
+#
+# GITHUB_TOKEN cannot write to another repository, so this needs a fine-grained
+# token with Actions (and Contents) write access to bazixv13/flatpak-repo,
+# stored here as FLATPAK_REPO_TOKEN. Without that secret this job fails on
+# purpose: a tag that never reaches the Flatpak repo otherwise looks like a
+# successful release until the next scheduled run picks it up.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to announce, for testing the dispatch itself
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch:
+    name: Dispatch to bazixv13/flatpak-repo
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Ask the Flatpak repo to publish this tag
+        env:
+          GH_TOKEN: ${{ secrets.FLATPAK_REPO_TOKEN }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${GH_TOKEN:-}" ]]; then
+            echo "::error::FLATPAK_REPO_TOKEN is not set in this repository, so the Flatpak repo will not learn about ${TAG} until its next scheduled run. Add a token with write access to bazixv13/flatpak-repo as FLATPAK_REPO_TOKEN."
+            exit 1
+          fi
+          gh api --method POST repos/bazixv13/flatpak-repo/dispatches \
+            -f event_type=upstream-release \
+            -f client_payload[tag]="${TAG}"
+          echo ">> Asked bazixv13/flatpak-repo to publish ${TAG}"
